@@ -1,0 +1,152 @@
+---
+title: "Addressing Limited Sanitation in Schools"
+subtitle: "R Assignment - AC584"
+author: "Claire Sweeney"
+format: 
+  html: 
+    theme: vapor
+    toc: true
+
+execute: 
+  echo: false
+  warning: false
+  message: false 
+---
+
+```{r}
+#| label: set
+#| include: false
+
+# libraries 
+library(tidyverse)
+library(plotly)
+
+# data
+unicef_indicator_1 <- read_csv("unicef_indicator_1.csv")
+unicef_indicator_2 <- read_csv("unicef_indicator_2.csv")
+unicef_metadata <- read_csv("unicef_metadata.csv")
+
+# transformations
+data_join <- unicef_metadata %>%
+  full_join(unicef_indicator_1, by = c("country", "year")) %>%
+  full_join(unicef_indicator_2,  by = c("country", "year" = "time_period"))
+```
+
+```{r}
+#| fig-cap: "This map shows the countries which have the highest proportion of schools with limited sanitation and those which have the lowest. While the data available shows many countries' proportion is low, the objective of the UN is to ensure all countries have proper sanitation. It is worrying that there are numerous countries in which 20% or more of schools have limited sanitation. We can see that Nicaragua (in South America) has one of the highest proportions."
+
+map_world <- map_data("world")
+
+data_join_2020 <- unicef_indicator_1 %>%
+  filter(year == 2020)
+
+map_data_join_2020 <- full_join(data_join_2020, map_world, by = c("country" = "region"))
+
+map <- ggplot(map_data_join_2020) +
+  aes(x = long, y = lat, group = group, fill = obs_value, country = country) +
+  geom_polygon() +
+  labs(title = paste("Proportion of Schools with Limited Sanitation in 2020")) +
+  labs(fill = paste("%")) +
+  labs(y = NULL, x = NULL) +
+  theme(panel.background = element_blank(), 
+        panel.grid.major.y = element_blank(),  
+        panel.grid.minor = element_blank(),
+        axis.line = element_blank(), axis.text = element_blank(), axis.ticks = element_blank()) +
+  scale_fill_gradient(low = "lightblue", high = "darkblue", na.value = "#333333")
+
+ggplotly(map)
+```
+
+```{r}
+#| fig-cap: "This scatterplot shows the relationship between GDP and limited sanitation in schools for countries across the world. While the regression line behaves as we would expect, there are a few outliers which require attention. Nicaragua has one of the highest porportions of schools with limited sanitation and it is clear it has a low GDP. Therefore, I will now delve further into Nicaragua's characteristics."
+
+sanitation_GDP_2020 <- data_join %>%
+  filter(`GDP per capita (constant 2015 US$)` > 0, year == 2020, obs_value.x > 0)
+
+# Calculate linear regression
+lm_model <- lm(obs_value.x ~ `GDP per capita (constant 2015 US$)`, data = sanitation_GDP_2020)
+
+# Create scatter plot
+scatterplot <- ggplot(sanitation_GDP_2020) +
+  aes(x = `GDP per capita (constant 2015 US$)`, y = obs_value.x, country = country) +
+  geom_point(color = "#40E0D0") +
+  theme(legend.position = "none", axis.title.y = element_text(size = 8), axis.title.x = element_text(size = 8)) +
+  # Add linear regression line
+  geom_abline(intercept = coef(lm_model)[1], slope = coef(lm_model)[2], color = "navy") +
+  labs(title = "Limited Sanitation in Schools and GDP per capita in Countries") +
+  labs(y = "Proportion of Schools 
+       with Limited Sanitation", x = "GDP per capita") +
+  theme(panel.background = element_blank()) +
+  theme(panel.grid.major.y = element_line("lightgrey"),  
+        panel.grid.minor = element_line("lightgrey"))
+
+ggplotly(scatterplot)
+```
+
+```{r}
+scatter_world <- unicef_metadata %>%
+  filter(`Life expectancy at birth, total (years)` > 40) %>%
+  ggplot() +
+  aes(year, `Life expectancy at birth, total (years)`, group = country, color = country) +
+  geom_line() +
+  labs(x = "Year", y = "Life expectancy", title = "Life Expectancy For All Countries") +
+  theme(legend.position = "none")
+
+ggplotly(scatter_world)
+```
+
+
+# Focusing on Nicaragua 
+
+```{r}
+#| fig-cap: "While Nicaragua's life expectancy has grown sinificantly over the past 50 years, it is still among the lower of life expectancies."
+
+metadata_join_2020 <- unicef_metadata %>%
+  filter(year == 2020)
+
+metadata_join_nicaragua <- unicef_metadata %>%
+  filter(country == "Nicaragua")
+
+time_series_nic <- metadata_join_nicaragua %>%
+  ggplot() +
+  aes(year, `Life expectancy at birth, total (years)`) +
+  geom_line(color = "navy") +
+  labs(x = "Year", y = "Life expectancy", title = "Nicaragua's Life Expectancy Since 1960") +
+  theme(legend.position = "none") +
+   theme(panel.background = element_blank()) +
+   theme(panel.grid.major.y = element_line("lightgrey"),  
+        panel.grid.minor = element_line("lightgrey"))
+
+ggplotly(time_series_nic)
+
+time_series_20yrs <- unicef_metadata %>%
+  filter(country == "Nicaragua", year > 2001 & year < 2020) %>%
+  ggplot() +
+  aes(year, `Life expectancy at birth, total (years)`, group = country) +
+  geom_line(color = "#40E0D0") +
+  labs(title = "Nicaragua's Life Expectancy Over 20 years") +
+  labs(y = "life expectancy") +
+  theme(panel.background = element_blank()) +
+   theme(panel.grid.major.y = element_line("lightgrey"),  
+        panel.grid.minor = element_line("lightgrey"))
+
+ggplotly(time_series_20yrs)
+```
+
+```{r}
+
+bar_chart <- unicef_metadata %>%
+  filter(country == "Nicaragua", year > 2000 & year < 2020) %>%
+  ggplot(aes(year, `GDP per capita (constant 2015 US$)`, fill = country)) +
+  geom_col() +
+  scale_fill_manual(values = "lightblue") +
+  labs(title = "Nicaragua's GDP over 20 years") +
+  labs(y = NULL, x = NULL) +
+  theme(legend.position = "none", panel.background = element_blank(), 
+        panel.grid.major.y = element_line(color = "lightgray"),  
+        panel.grid.minor = element_blank(),
+        axis.line = element_blank())
+
+ggplotly(bar_chart)
+```
+
